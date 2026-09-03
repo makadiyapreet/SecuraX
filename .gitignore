@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+env/
+.env
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (large files — keep structure, ignore content)
+data/raw/*.csv
+data/raw/*.json
+data/raw/*.jsonl
+data/raw/*.zip
+data/raw/*.gz
+data/processed/*.csv
+data/processed/*.json
+data/processed/*.pkl
+data/processed/*.parquet
+
+# Models (large checkpoints)
+models/checkpoints/
+*.pt
+*.bin
+*.safetensors
+*.onnx
+
+# HuggingFace cache
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+wandb/
+runs/
