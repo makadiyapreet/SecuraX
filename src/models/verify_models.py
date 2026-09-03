@@ -417,8 +417,8 @@ def main():
     args = parser.parse_args()
 
     print("=" * 60)
-    print("  MODEL VERIFICATION — Phase 0")
-    print("  Automated Code Vulnerability Detection Project")
+    print("  SECURAX — MODEL VERIFICATION (Phase 0)")
+    print("  Automated Vulnerability Detection & Refinement Framework")
     print("=" * 60)
 
     # GPU info

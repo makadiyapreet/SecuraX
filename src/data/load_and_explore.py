@@ -503,8 +503,8 @@ def main():
     args = parser.parse_args()
 
     print("=" * 70)
-    print("  BIGVUL DATASET — EXPLORATION REPORT")
-    print("  Automated Code Vulnerability Detection Project — Phase 0")
+    print("  SECURAX — BIGVUL DATASET EXPLORATION REPORT")
+    print("  Phase 0: Automated Vulnerability Detection & Severity Scoring")
     print("=" * 70)
 
     # Load data

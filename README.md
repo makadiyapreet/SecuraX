@@ -1,4 +1,4 @@
-# Automated Code Vulnerability Detection, Multi-Class Classification & Severity Scoring
+# SecuraX: An AI-Based Framework for Automated Source Code Vulnerability Detection, Multi-Class Classification, Severity Scoring and LLM-Assisted Code Refinement
 
 ## Problem Statement
 

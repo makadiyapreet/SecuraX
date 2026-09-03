@@ -1,6 +1,7 @@
-# Phase 0 — Scoping & Setup
+# Phase 0 — Scoping & Setup: SecuraX
 
-**Date:** September 2026
+**Project:** SecuraX — An AI-Based Framework for Automated Source Code Vulnerability Detection, Multi-Class Classification, Severity Scoring and LLM-Assisted Code Refinement  
+**Date:** September 2026  
 **Phase Goal:** Initialize the project, set up the development environment, explore the dataset, and verify that all required models can be loaded locally.
 
 ---
