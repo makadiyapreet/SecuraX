@@ -1,1 +1,1 @@
-# Data subpackage
+# src.data — Data loading, preprocessing, and exploration

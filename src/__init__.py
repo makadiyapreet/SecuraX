@@ -1,1 +1,1 @@
-# Make src a package
+# src — Automated Code Vulnerability Detection

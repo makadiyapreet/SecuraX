@@ -1,1 +1,1 @@
-# Models subpackage
+# src.models — Model definitions, training, and verification

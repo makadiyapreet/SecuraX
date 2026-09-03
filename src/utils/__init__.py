@@ -1,1 +1,1 @@
-# Utils subpackage
+# src.utils — Shared utilities

@@ -1,153 +1,157 @@
-# 🛡️ VulnDetect — Automated Code Vulnerability Detection, Classification & Severity Scoring
+# Automated Code Vulnerability Detection, Multi-Class Classification & Severity Scoring
 
 ## Problem Statement
 
-Software vulnerabilities in open-source code continue to be a leading cause of security breaches. This project builds an end-to-end ML pipeline that, given a source code snippet, **(1)** detects whether it is vulnerable, **(2)** classifies the vulnerability type (CWE-id), **(3)** assigns a severity score (CVSS-based), and **(4)** generates a refined/fixed version of the code using an LLM. The final output is a structured table with columns: **PL, Snippet, VF, CWE-id, Refined Code, LOC, Severity Score**. The primary evaluation metric is **Recall**, with Precision, F1, and AUROC tracked alongside.
+Given a source code file or snippet, this system **detects** whether the code is vulnerable, **classifies** the vulnerability type (CWE-id), assigns a **severity score** (CVSS 0–10), and produces a **refined/fixed version** of the code using LLM-based generation.
+
+**Output format:** A table with columns:
+
+| PL | Snippet | VF | CWE-id | Refined Code | LOC | Severity Score |
+|----|---------|-----|--------|--------------|-----|----------------|
+| C  | `...`   | 1   | CWE-119 | `...`       | 12  | 7.5            |
+
+**Primary metric:** Recall (with Precision, F1, and AUROC tracked alongside).
+
+---
 
 ## Team Roles
 
-| Person | Role | Approach |
-|--------|------|----------|
-| **Person A** | Detection, Classification, Severity Scoring | Supervised fine-tuning (CodeBERT / UnixCoder + LoRA) |
-| **Person B** | LLM-based Code Refinement | Prompting-based (Mistral-7B / DeepSeek-Coder via Ollama) — no ground-truth fixes in dataset |
+| Person | Role | Responsibility |
+|--------|------|----------------|
+| **A** | Detection / Classification / Severity | Supervised fine-tuning of CodeT5 & GraphCodeBERT for vulnerability detection, CWE classification, and severity scoring |
+| **B** | LLM-Based Code Refinement | Prompting-based code fixing using Mistral-7B-Instruct & DeepSeek-Coder-Instruct (no ground-truth fixed code in dataset) |
 
-## Tech Stack (100% Free & Open-Source)
+---
 
-| Category | Tool/Library | License | Notes |
-|----------|-------------|---------|-------|
-| **Detection Encoder** | [CodeBERT](https://huggingface.co/microsoft/codebert-base) | MIT | Pre-trained code understanding model |
-| **Detection Encoder** | [UnixCoder](https://huggingface.co/microsoft/unixcoder-base) | MIT | Alternative encoder |
-| **Refinement LLM** | [Mistral-7B-Instruct](https://ollama.com/library/mistral) | Apache-2.0 | Via Ollama (local) |
-| **Refinement LLM** | [DeepSeek-Coder-Instruct](https://ollama.com/library/deepseek-coder) | DeepSeek License | Via Ollama (local) |
-| **Fine-Tuning** | [PEFT/LoRA](https://github.com/huggingface/peft) | Apache-2.0 | Parameter-efficient fine-tuning |
-| **ML Framework** | [PyTorch](https://pytorch.org/) | Apache-2.0 | Deep learning backend |
-| **Transformers** | [HuggingFace Transformers](https://huggingface.co/transformers) | Apache-2.0 | Model loading & tokenization |
-| **Static Analysis** | [Bandit](https://bandit.readthedocs.io/) | Apache-2.0 | Python security linter |
-| **Static Analysis** | [Cppcheck](http://cppcheck.net/) | GPL-3.0 | C/C++ static analyzer (system install) |
-| **Web App** | [Streamlit](https://streamlit.io/) | Apache-2.0 | Interactive demo UI |
-| **Dataset** | [BigVul (MSR 2020)](https://github.com/ZeoVan/MSR_20_Code_vulnerability_CSV_Dataset) | Research | Primary dataset |
-| **Dataset** | CVEfixes | Research | Optional cross-check |
-| **Evaluation** | [scikit-learn](https://scikit-learn.org/) | BSD-3 | Metrics & splitting |
-| **LLM Runtime** | [Ollama](https://ollama.com/) | MIT | Local LLM server (system install) |
+## Tool Stack
+
+> **Hard constraint:** Every tool, library, model, and dataset is **free and open-source** (MIT/Apache-2.0/BSD/GPL or free-to-use research license). No paid APIs, no paid cloud, no subscriptions.
+
+| Category | Tool | License | Purpose |
+|----------|------|---------|---------|
+| **Detection Encoders** | [CodeT5-base](https://huggingface.co/Salesforce/codet5-base) | Apache-2.0 | Vulnerability detection & CWE classification |
+| | [GraphCodeBERT-base](https://huggingface.co/microsoft/graphcodebert-base) | MIT | Code understanding encoder |
+| **Refinement LLMs** | [Mistral-7B-Instruct](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3) | Apache-2.0 | Code refinement/fixing (4-bit quantized) |
+| | [DeepSeek-Coder-6.7B-Instruct](https://huggingface.co/deepseek-ai/deepseek-coder-6.7b-instruct) | Deepseek License | Code refinement/fixing (4-bit quantized) |
+| **ML Framework** | PyTorch | BSD-3 | Deep learning framework |
+| | HuggingFace Transformers | Apache-2.0 | Model loading & fine-tuning |
+| | PEFT / LoRA | Apache-2.0 | Parameter-efficient fine-tuning |
+| | bitsandbytes | MIT | 4-bit quantization |
+| | Accelerate | Apache-2.0 | Device mapping & mixed precision |
+| **Data Science** | scikit-learn, pandas, numpy | BSD-3 | Metrics, data processing |
+| **Dataset** | [BigVul (MSR 2020)](https://github.com/ZeoVan/MSR_20_Code_Vulnerability_CSV_Dataset) | Research | ~188K C/C++ functions with CWE-ids & CVSS scores |
+| **Static Analysis** | Bandit | Apache-2.0 | Python vulnerability scanner |
+| | Cppcheck (system) | GPL-3.0 | C/C++ static analysis |
+| **Web App** | Streamlit | Apache-2.0 | Interactive demo UI |
+| **Optional** | vLLM | Apache-2.0 | Faster local LLM serving |
+
+---
 
 ## Repository Structure
 
 ```
 Minor Project/
-├── README.md                  # ← This file (living summary)
-├── requirements.txt           # Python dependencies (pip)
-├── run_phase0_checks.py       # Master Phase 0 verification script
-├── .gitignore
-│
 ├── data/
-│   ├── raw/                   # Original datasets (git-ignored)
-│   └── processed/             # Cleaned/split data (git-ignored)
-│
+│   ├── raw/                    # Original datasets (gitignored)
+│   └── processed/              # Preprocessed splits (gitignored)
+├── notebooks/                  # Jupyter notebooks for exploration
 ├── src/
 │   ├── __init__.py
-│   ├── config.py              # Central project configuration
 │   ├── data/
 │   │   ├── __init__.py
-│   │   ├── download_bigvul.py # Dataset download helper
-│   │   └── load_data.py       # Data loading & exploration
+│   │   ├── download_bigvul.py  # Dataset downloader
+│   │   └── load_and_explore.py # Data exploration script
 │   ├── models/
-│   │   └── __init__.py        # (Phase 1+: detection/classification models)
-│   ├── pipelines/
-│   │   └── __init__.py        # (Phase 3+: end-to-end pipeline)
+│   │   ├── __init__.py
+│   │   └── verify_models.py    # Model loading verification
+│   ├── evaluation/
+│   │   └── __init__.py
 │   └── utils/
-│       ├── __init__.py
-│       ├── verify_hf_model.py # HuggingFace model verification
-│       └── verify_ollama.py   # Ollama installation verification
-│
+│       └── __init__.py
 ├── models/
-│   ├── checkpoints/           # Saved model weights (git-ignored)
-│   └── configs/               # Training configurations
-│
-├── notebooks/                 # Jupyter notebooks for exploration
-├── docs/                      # Phase documentation
-│   └── PHASE_0.md
-├── app/
-│   └── main.py                # Streamlit web app (placeholder)
-└── tests/                     # Unit tests (Phase 2+)
+│   ├── checkpoints/            # Training checkpoints (gitignored)
+│   └── saved/                  # Final saved models (gitignored)
+├── docs/
+│   └── PHASE_0.md              # Phase 0 documentation
+├── app/                        # Streamlit app (future phases)
+├── logs/                       # Training logs
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
+
+---
 
 ## Environment Setup
 
 ### Prerequisites
 
-- **Python 3.10+** (tested with 3.13.1)
+- **Python 3.10+** (tested with 3.13)
 - **Git**
-- **Ollama** (system-level install for LLM inference)
-- **Cppcheck** (system-level install for C/C++ static analysis)
+- **cppcheck** (system-level): `brew install cppcheck` (macOS) or `sudo apt install cppcheck` (Ubuntu)
+- **GPU** (recommended): NVIDIA GPU with CUDA for 4-bit quantization, or Apple Silicon with MPS
 
-### Step-by-Step Installation
+### Installation
 
 ```bash
 # 1. Clone the repository
 git clone <repo-url>
 cd "Minor Project"
 
-# 2. Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate        # macOS/Linux
-# venv\Scripts\activate         # Windows
+# 2. Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate   # macOS/Linux
+# .venv\Scripts\activate    # Windows
 
-# 3. Install Python dependencies
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Install system-level tools
-# macOS:
-brew install ollama cppcheck
-# Ubuntu/Debian:
-# sudo apt install cppcheck
-# curl -fsSL https://ollama.com/install.sh | sh
+# 4. Download the dataset
+python src/data/download_bigvul.py
 
-# 5. Start Ollama server (keep running in background)
-ollama serve &
+# 5. Explore the dataset
+python src/data/load_and_explore.py
 
-# 6. Download the dataset
-python -m src.data.download_bigvul
-
-# 7. Run all Phase 0 checks
-python run_phase0_checks.py
+# 6. Verify models can be loaded
+python src/models/verify_models.py          # Full verification
+python src/models/verify_models.py --skip-large  # Encoders only
 ```
 
-### Quick Verification
+### Optional: Install cppcheck
 
 ```bash
-# Explore the dataset
-python -m src.data.load_data
+# macOS
+brew install cppcheck
 
-# Test HuggingFace model loading
-python -m src.utils.verify_hf_model
+# Ubuntu/Debian
+sudo apt-get install cppcheck
 
-# Test Ollama
-python -m src.utils.verify_ollama
-
-# Launch the (placeholder) web app
-streamlit run app/main.py
+# Verify
+cppcheck --version
 ```
+
+---
 
 ## Train/Val/Test Split Strategy
 
-| Split | Ratio | Strategy |
-|-------|-------|----------|
-| Train | 80% | Stratified by vulnerability flag + CWE-id |
-| Validation | 10% | Same stratification |
-| Test | 10% | Same stratification |
+- **Method:** Stratified split by CWE-id
+- **Ratios:** 70% Train / 15% Validation / 15% Test
+- **Random seed:** 42 (for reproducibility)
+- **Minimum samples per class:** 2 (classes with fewer samples are dropped)
 
-- **Seed:** 42 (reproducible across runs)
-- **Stratification:** Composite key — vulnerable samples are stratified by CWE-id; non-vulnerable samples form their own stratum. CWE classes with < 5 samples are grouped into a "rare" bucket to prevent split failures.
+---
 
 ## Project Status
 
-> **✅ Phase 0 — Scoping & Setup: COMPLETE**
+**✅ Phase 0 complete** — Project structure initialized, environment set up, data exploration done, model loading verified.
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 0 | Scoping & Setup | ✅ Complete |
-| 1 | Vulnerability Detection (Binary) | 🔲 Not started |
-| 2 | CWE Classification (Multi-class) | 🔲 Not started |
-| 3 | Severity Scoring | 🔲 Not started |
-| 4 | LLM Code Refinement | 🔲 Not started |
-| 5 | Streamlit App & Integration | 🔲 Not started |
+| **0** | Scoping & Setup | ✅ Complete |
+| 1 | Data Preprocessing & Feature Engineering | 🔲 Not started |
+| 2 | Vulnerability Detection (Binary) | 🔲 Not started |
+| 3 | CWE Multi-Class Classification | 🔲 Not started |
+| 4 | Severity Scoring | 🔲 Not started |
+| 5 | LLM-Based Code Refinement | 🔲 Not started |
+| 6 | Integration & Streamlit App | 🔲 Not started |
+| 7 | Evaluation & Final Report | 🔲 Not started |
