@@ -9,124 +9,143 @@
 
 ### System-Level Tools
 
-| Tool | Install Command (macOS) | Install Command (Linux) | Purpose |
-|------|------------------------|------------------------|---------|
-| Python 3.10+ | Pre-installed / `brew install python` | `sudo apt install python3` | Runtime |
-| Git | `xcode-select --install` | `sudo apt install git` | Version control |
-| Ollama | `brew install ollama` | `curl -fsSL https://ollama.com/install.sh \| sh` | Local LLM server |
-| Cppcheck | `brew install cppcheck` | `sudo apt install cppcheck` | C/C++ static analysis |
+| Tool | Version Installed | Install Command (macOS) | Purpose |
+|------|-------------------|------------------------|---------|
+| Python | 3.13.1 | Pre-installed | Runtime |
+| Git | (pre-installed) | `xcode-select --install` | Version control |
+| Ollama | 0.33.2 | `brew install ollama` | Local LLM server |
+| Cppcheck | 2.21.0 | `brew install cppcheck` | C/C++ static analysis |
 
 ### Python Environment
 
 ```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install all dependencies
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Key packages installed:**
-- `torch` (PyTorch) — deep learning framework
-- `transformers` — HuggingFace model loading
-- `peft` — LoRA / parameter-efficient fine-tuning
-- `datasets` — HuggingFace dataset utilities
-- `scikit-learn` — evaluation metrics, stratified splitting
-- `pandas`, `numpy` — data manipulation
-- `streamlit` — web app framework
-- `bandit` — Python security linter
-- `matplotlib`, `seaborn` — visualization
+**Installed versions (key packages):**
+- `torch` 2.14.0 (MPS backend for Apple M2)
+- `transformers` 5.16.1
+- `peft` 0.20.0
+- `scikit-learn` 1.9.0
+- `pandas` 3.0.5
+- `streamlit` 1.63.0
 
 All packages are free & open-source (MIT / Apache-2.0 / BSD / GPL).
 
 ---
 
-## Dataset Exploration
+## Data Exploration Results
 
 ### Dataset: BigVul (Fan et al., MSR 2020)
 
-**Source:** [GitHub — MSR_20_Code_vulnerability_CSV_Dataset](https://github.com/ZeoVan/MSR_20_Code_vulnerability_CSV_Dataset)
+**Source:** [GitHub — MSR_20_Code_vulnerability_CSV_Dataset](https://github.com/ZeoVan/MSR_20_Code_vulnerability_CSV_Dataset)  
+**File:** `all_c_cpp_release2.0.csv` (53.8 MB)
 
-**Download command:**
-```bash
-python -m src.data.download_bigvul
-```
+### Key Findings
 
-### What the Data Exploration Script Reports
+| Metric | Value |
+|--------|-------|
+| **Total samples** | **4,432** rows |
+| **Columns** | 22 |
+| **Languages** | C (4,203 = 94.8%), C++ (229 = 5.2%) |
+| **Unique CWE-ids** | 91 (739 rows with null CWE) |
+| **Severity (CVSS v2)** | Continuous 0.0–10.0, mean 5.95, median 6.60 |
+| **Vulnerability flag** | ⚠️ **NOT PRESENT** — all 4,432 rows are vulnerable |
+| **Inline code** | ⚠️ **NOT PRESENT** — metadata only |
+| **Unique projects** | Multiple open-source projects (Linux kernel dominant) |
 
-Run with:
-```bash
-python -m src.data.load_data
-```
+### ⚠️ Critical Finding 1: No Vulnerability Flag Column
 
-The script (`src/data/load_data.py`) prints the following:
+This dataset version contains **only CVE records** — every row is a known vulnerability. There is no `vul` column and no non-vulnerable samples.
 
-1. **Total sample count** — number of rows in the CSV
-2. **Vulnerability flag distribution** — count and percentage of vulnerable (1) vs. non-vulnerable (0) samples, plus the imbalance ratio
-3. **CWE-id distribution** — unique CWE count, top-20 CWE-ids by frequency, and long-tail statistics
-4. **Severity score format** — whether a CVSS column exists, its range (continuous 0–10 or categorical), and proposed binning into Low/Medium/High/Critical
-5. **Programming languages** — detected language columns or inferred from file paths (BigVul is primarily C/C++)
-6. **Code snippet columns** — which columns contain source code, average length, and a sample
-7. **Stratified split creation** — 80/10/10 train/val/test split with per-split class balance verification
+**Impact:** For binary vulnerability detection (Phase 1), we need non-vulnerable code samples.
 
-### Expected Findings (BigVul)
+**Resolved — Options for Phase 1:**
+1. Use **Devign** dataset (balanced C/C++ vul/non-vul functions)
+2. Use **BigVul with code** from HuggingFace (`benjis/bigvul`) which includes both vulnerable and non-vulnerable function pairs
+3. Sample non-vulnerable functions from the same projects via git history
+4. Combine with **CVEfixes** dataset
 
-| Metric | Expected Value |
-|--------|---------------|
-| Total samples | ~188,000+ functions |
-| Languages | C, C++ |
-| Vulnerable % | ~5–10% (heavily imbalanced) |
-| Unique CWE-ids | ~100–170 |
-| Severity format | CVSS v2 score (0.0–10.0, continuous) if present; otherwise mapped from CWE |
-| Key columns | `func_before`, `vul`, `cwe_id`, `cvss`, `project`, `commit_id` |
+### ⚠️ Critical Finding 2: No Inline Code
 
-> **Note:** Exact numbers depend on the dataset version downloaded. Run the script for precise counts.
+The columns `version_before_fix` and `version_after_fix` contain **git commit hashes** (40-char SHA), not source code. The actual code must be fetched from git repositories using these commit references.
 
-### Severity Score Decision
+**Available reference columns:**
+- `commit_id` — 4,429 non-null git commit SHAs
+- `version_before_fix` — 4,432 commit hashes (vulnerable version)
+- `version_after_fix` — 4,432 commit hashes (fixed version)
+- `project` — source project name
+- `ref_link` — reference URLs
 
-The BigVul dataset may include a `cvss` column with CVSS v2 base scores (continuous, 0.0–10.0). Our decision:
+### CWE-id Distribution (Top 20 of 91)
 
-- **Keep as continuous** for regression-based severity scoring
-- **Also bin into 4 categories** for classification experiments:
+| CWE-ID | Count | % | Description |
+|--------|-------|---|-------------|
+| CWE-119 | 694 | 15.7% | Buffer overflow |
+| CWE-20 | 445 | 10.0% | Improper input validation |
+| CWE-125 | 365 | 8.2% | Out-of-bounds read |
+| CWE-200 | 272 | 6.1% | Information exposure |
+| CWE-264 | 266 | 6.0% | Permissions/privileges/access control |
+| CWE-399 | 265 | 6.0% | Resource management errors |
+| CWE-416 | 184 | 4.2% | Use after free |
+| CWE-189 | 133 | 3.0% | Numeric errors |
+| CWE-476 | 133 | 3.0% | NULL pointer dereference |
+| CWE-190 | 109 | 2.5% | Integer overflow |
+| CWE-362 | 99 | 2.2% | Race condition |
+| CWE-787 | 72 | 1.6% | Out-of-bounds write |
+| CWE-284 | 68 | 1.5% | Improper access control |
+| CWE-79 | 44 | 1.0% | Cross-site scripting |
+| CWE-254 | 34 | 0.8% | Security features |
+| CWE-772 | 34 | 0.8% | Missing resource release |
+| CWE-415 | 31 | 0.7% | Double free |
+| CWE-400 | 27 | 0.6% | Uncontrolled resource consumption |
+| CWE-369 | 27 | 0.6% | Divide by zero |
+| CWE-17 | 24 | 0.5% | Code quality |
+| *(other 71 CWEs)* | 367 | 8.3% | — |
 
-| Category | CVSS Range |
-|----------|-----------|
-| Low | 0.0 – 3.9 |
-| Medium | 4.0 – 6.9 |
-| High | 7.0 – 8.9 |
-| Critical | 9.0 – 10.0 |
+### Severity Score (CVSS v2)
 
-If no CVSS column is present, severity will be mapped from CWE-ids using NVD/CWE standard severity mappings in Phase 1.
+| Category | CVSS Range | Count | % of scored |
+|----------|-----------|-------|------------|
+| Low | 0.0 – 3.9 | 301 | 7.3% |
+| **Medium** | **4.0 – 6.9** | **2,397** | **58.2%** |
+| High | 7.0 – 8.9 | 1,098 | 26.7% |
+| Critical | 9.0 – 10.0 | 318 | 7.7% |
+| *(null)* | — | 318 | — |
+
+**Format:** Continuous CVSS v2 base score (0.0–10.0)  
+**Decision:** Keep continuous for regression + bin into 4 categories for classification.
 
 ---
 
 ## Verification Results
 
 ### ✅ Git Repository
-- Initialized with sensible directory structure
-- `.gitignore` covers Python, data, model checkpoints, and IDE files
+- Initialized with project structure (21 files committed)
 
 ### ✅ Python Environment
-- `requirements.txt` created with all free/open-source packages
-- All packages installable via `pip install -r requirements.txt`
+- All packages installed via `pip install -r requirements.txt`
+- PyTorch 2.14.0 with MPS backend
 
-### ⬜ Dataset Download & Exploration
-- Download script ready: `python -m src.data.download_bigvul`
-- Exploration script ready: `python -m src.data.load_data`
-- **Requires user to run** (dataset is ~170 MB)
+### ✅ Dataset Download & Exploration
+- Downloaded: `all_c_cpp_release2.0.csv` (53.8 MB, 4,432 rows)
+- Exploration script correctly identifies all columns and distributions
+- Critical findings documented (no inline code, no non-vulnerable samples)
 
-### ⬜ HuggingFace Model Verification
-- Verification script ready: `python -m src.utils.verify_hf_model`
-- Tests `microsoft/codebert-base` download, loading to MPS/CPU, and forward pass
-- **Requires user to run** (model download ~440 MB)
+### ✅ HuggingFace Model (CodeBERT)
+- `microsoft/codebert-base` downloaded successfully
+- 124,645,632 parameters (498.6 MB @ FP32)
+- Loaded on **MPS** (Apple M2 Metal GPU)
+- Test inference passed: 68 tokens → torch.Size([1, 68, 768]) in 2,961 ms
 
-### ⬜ Ollama Verification
-- Verification script ready: `python -m src.utils.verify_ollama`
-- **Requires Ollama installation first:** `brew install ollama`
-- Tests server status, model pull, and test inference
+### ⬜ Ollama — Needs Server Start
+- Ollama CLI installed (v0.33.2) ✅
+- Server not started during initial test run
+- **Fix:** Run `brew services start ollama` then `python -m src.utils.verify_ollama`
 
-### Compute Environment Detected
+### Compute Environment
 
 | Property | Value |
 |----------|-------|
@@ -134,41 +153,44 @@ If no CVSS column is present, severity will be mapped from CWE-ids using NVD/CWE
 | RAM | 8 GB |
 | GPU | Apple MPS (Metal Performance Shaders) |
 | Python | 3.13.1 |
-| OS | macOS |
-
-> **Note:** 8 GB RAM is tight for 7B LLMs. Mistral-7B requires ~4–5 GB in Q4 quantization. Fine-tuning with LoRA will need careful batch sizing. This is documented for Phase 1 planning.
+| PyTorch | 2.14.0 |
+| OS | macOS (arm64) |
 
 ---
 
 ## Train/Val/Test Split Strategy
 
-**Confirmed strategy for ALL future phases:**
+**Confirmed for ALL future phases:**
 
 ```
 Split:   Train 80%  |  Val 10%  |  Test 10%
 Seed:    42
-Method:  sklearn.model_selection.train_test_split (two-stage)
-Stratify: Composite key (vulnerability_flag + CWE-id)
+Method:  sklearn train_test_split (two-stage)
+Stratify: CWE-id (rare CWEs with <3 samples grouped)
 ```
 
-**Details:**
-1. Create composite stratification key: `"vul_{CWE-id}"` for vulnerable samples, `"non_vul"` for non-vulnerable
-2. CWE classes with < 5 samples are grouped as `"vul_rare"` to prevent split failures
-3. First split: 80% train vs 20% (val+test)
-4. Second split: 50/50 within the 20% → 10% val, 10% test
-5. Split indices saved to `data/processed/split_indices.npz`
+| Split | Samples | % |
+|-------|---------|---|
+| Train | 3,545 | 80.0% |
+| Val | 443 | 10.0% |
+| Test | 444 | 10.0% |
+| **Total** | **4,432** | **100%** |
+
+Split indices saved to `data/processed/split_indices.npz`.
 
 ---
 
-## Open Questions & Decisions
+## Decisions Made
 
 | # | Question | Decision |
 |---|----------|----------|
-| 1 | Which severity score format? | Dual: keep continuous CVSS for regression + bin into 4 categories for classification |
-| 2 | How to handle CWE classes with very few samples? | Group rare CWEs (< N samples) during training; exact threshold TBD in Phase 2 |
-| 3 | Which encoder to use as primary? | Start with CodeBERT; compare with UnixCoder in Phase 1 |
-| 4 | 8 GB RAM sufficient for Mistral-7B? | Use Q4 quantization via Ollama; batch size = 1 for inference |
-| 5 | No ground-truth fixed code for refinement? | Person B will use prompting-based LLM refinement (no supervised fine-tuning for refinement task) |
+| 1 | Severity score format? | **Dual:** continuous CVSS for regression + 4-category bins for classification |
+| 2 | Dataset has no inline code? | **Use alternative source for Phase 1** — either BigVul-with-code from HuggingFace, Devign dataset, or fetch code via commit hashes |
+| 3 | Dataset has no non-vulnerable samples? | **Need to supplement** — Devign or BigVul-full version includes both |
+| 4 | Split stratification key? | **CWE-id** (since all samples are vulnerable, can't stratify by vul flag) |
+| 5 | Which encoder first? | Start with CodeBERT; compare UnixCoder in Phase 1 |
+| 6 | 8 GB RAM for 7B LLMs? | Use Q4 quantization via Ollama; batch size = 1 |
+| 7 | This metadata CSV still useful? | **YES** — use for CWE→severity mapping table, project context, and cross-referencing |
 
 ---
 
@@ -176,31 +198,42 @@ Stratify: Composite key (vulnerability_flag + CWE-id)
 
 ```bash
 # 1. Set up environment
-python3 -m venv venv && source venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 2. Install system tools (if not already done)
+# 2. Install system tools
 brew install ollama cppcheck
 
 # 3. Download dataset
 python -m src.data.download_bigvul
 
-# 4. Run ALL Phase 0 checks
-python run_phase0_checks.py
+# 4. Explore dataset
+python -m src.data.load_data
 
-# 5. Or run individual checks:
-python -m src.data.load_data           # Dataset exploration
-python -m src.utils.verify_hf_model    # CodeBERT verification
-python -m src.utils.verify_ollama      # Ollama verification
+# 5. Start Ollama and verify
+brew services start ollama
+python -m src.utils.verify_ollama
+
+# 6. Verify HuggingFace model
+python -m src.utils.verify_hf_model
+
+# 7. Run ALL checks
+python run_phase0_checks.py
 ```
 
 ---
 
 ## What's Next (Phase 1)
 
-Phase 1 will cover **Binary Vulnerability Detection**:
-- Fine-tune CodeBERT/UnixCoder with a binary classification head
-- Use LoRA for parameter-efficient fine-tuning
-- Handle class imbalance (oversampling / weighted loss)
-- Evaluate with Recall (primary), Precision, F1, AUROC
-- Establish baseline performance
+Phase 1 will address the two critical gaps before starting model training:
+
+1. **Obtain a dataset with actual code + vulnerability labels:**
+   - Option A: BigVul processed version with `func_before`/`func_after` columns
+   - Option B: Devign dataset (balanced binary classification, C functions)
+   - Option C: Fetch code from git repos using commit hashes from this metadata CSV
+
+2. **Binary Vulnerability Detection:**
+   - Fine-tune CodeBERT/UnixCoder with a binary classification head
+   - Use LoRA for parameter-efficient fine-tuning on M2
+   - Handle class imbalance (oversampling / weighted loss)
+   - Evaluate: Recall (primary), Precision, F1, AUROC

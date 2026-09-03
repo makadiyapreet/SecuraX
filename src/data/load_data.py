@@ -64,22 +64,42 @@ def explore_schema(df: pd.DataFrame) -> None:
 
 def explore_vulnerability_flag(df: pd.DataFrame) -> str:
     """Identify and print the vulnerability flag column."""
-    # BigVul uses 'vul' column (1 = vulnerable, 0 = not vulnerable)
+    # Check for explicit vulnerability flag column
     vul_col = None
     for candidate in ["vul", "vulnerable", "target", "label", "VF"]:
         if candidate in df.columns:
             vul_col = candidate
             break
     
+    print("=" * 60)
+    print("VULNERABILITY FLAG ANALYSIS")
+    print("=" * 60)
+    
     if vul_col is None:
-        print("⚠️  Could not auto-detect vulnerability flag column.")
-        print(f"   Available columns: {list(df.columns)}")
+        # This dataset version is metadata-only: all rows are CVE records
+        # (all vulnerable). There is no explicit vul/non-vul flag.
+        has_cve = "cve_id" in df.columns
+        cve_non_null = df["cve_id"].notna().sum() if has_cve else 0
+        
+        print("  ⚠️  No explicit vulnerability flag column found.")
+        print()
+        print("  ANALYSIS: This dataset version (all_c_cpp_release2.0.csv) is a")
+        print("  CVE metadata dataset. Every row represents a known vulnerability.")
+        if has_cve:
+            print(f"  Evidence: {cve_non_null:,} of {len(df):,} rows have a CVE-id.")
+        print()
+        print("  IMPLICATION: All {len(df):,} samples are VULNERABLE.")
+        print("  For binary vulnerability detection (Phase 1), we will need")
+        print("  to add non-vulnerable code samples. Options:")
+        print("    1. Use Devign dataset (has balanced vul/non-vul C/C++ functions)")
+        print("    2. Sample non-vulnerable functions from the same projects")
+        print("    3. Combine with CVEfixes dataset which includes both")
+        print()
+        print("  DECISION REQUIRED: How to source non-vulnerable samples.")
+        print()
         return None
     
-    print("=" * 60)
-    print(f"VULNERABILITY FLAG (column: '{vul_col}')")
-    print("=" * 60)
-    
+    print(f"  Column: '{vul_col}'")
     counts = df[vul_col].value_counts()
     total = len(df)
     for val, count in counts.items():
@@ -102,7 +122,6 @@ def explore_cwe_distribution(df: pd.DataFrame) -> str:
             break
     
     if cwe_col is None:
-        # Check if CWE info is embedded in another column
         print("⚠️  No explicit CWE column found.")
         print(f"   Available columns: {list(df.columns)}")
         return None
@@ -113,7 +132,10 @@ def explore_cwe_distribution(df: pd.DataFrame) -> str:
     
     cwe_counts = df[cwe_col].value_counts()
     unique_cwes = len(cwe_counts)
+    null_cwes = df[cwe_col].isna().sum()
     print(f"  Unique CWE-ids: {unique_cwes}")
+    print(f"  Rows with CWE:  {df[cwe_col].notna().sum():,}")
+    print(f"  Rows without:   {null_cwes:,}")
     print()
     
     # Top 20 CWEs
@@ -127,6 +149,16 @@ def explore_cwe_distribution(df: pd.DataFrame) -> str:
     if unique_cwes > 20:
         remaining = cwe_counts.iloc[20:].sum()
         print(f"  {'(other '+str(unique_cwes-20)+' CWEs)':<20} {remaining:>8,} {remaining/len(df)*100:>7.1f}%")
+    
+    # CWE class size analysis (for stratification planning)
+    print()
+    print(f"  CWE class size distribution:")
+    bins = [0, 1, 5, 10, 50, 100, 500, float('inf')]
+    labels = ['1', '2-5', '6-10', '11-50', '51-100', '101-500', '500+']
+    class_sizes = pd.cut(cwe_counts.values, bins=bins, labels=labels)
+    size_dist = pd.Series(class_sizes).value_counts().sort_index()
+    for bucket, count in size_dist.items():
+        print(f"    {str(bucket)+' samples':<20} {count:>4} CWE classes")
     
     print()
     return cwe_col
@@ -154,12 +186,6 @@ def explore_severity(df: pd.DataFrame) -> str:
     if sev_col is None:
         print("  ⚠️  No explicit severity/CVSS column found.")
         print(f"   Available columns: {list(df.columns)}")
-        print()
-        print("  DECISION: Since BigVul does not always include a CVSS column,")
-        print("  we will map CWE-ids to CVSS base scores using the NVD/CWE")
-        print("  severity mappings, or use a lookup table.")
-        print("  This will be implemented in Phase 1.")
-        print()
         return None
     
     print(f"  Column: '{sev_col}'")
@@ -170,7 +196,7 @@ def explore_severity(df: pd.DataFrame) -> str:
     unique_vals = df[sev_col].dropna().unique()
     
     if df[sev_col].dtype in [np.float64, np.float32, np.int64, np.int32]:
-        print(f"  Format: CONTINUOUS (numeric)")
+        print(f"  Format: CONTINUOUS (CVSS v2 base score)")
         print(f"  Range:  {df[sev_col].min():.2f} – {df[sev_col].max():.2f}")
         print(f"  Mean:   {df[sev_col].mean():.2f}")
         print(f"  Median: {df[sev_col].median():.2f}")
@@ -183,7 +209,12 @@ def explore_severity(df: pd.DataFrame) -> str:
         for label, (lo, hi) in SEVERITY_BINS.items():
             mask = (df[sev_col] >= lo) & (df[sev_col] <= hi)
             count = mask.sum()
-            print(f"    {label:<10} [{lo:.1f}–{hi:.1f}]: {count:>8,} samples")
+            pct = count / df[sev_col].notna().sum() * 100
+            print(f"    {label:<10} [{lo:.1f}–{hi:.1f}]: {count:>8,} samples ({pct:.1f}%)")
+        
+        nulls = df[sev_col].isna().sum()
+        if nulls > 0:
+            print(f"    {'(null)':<10}             {nulls:>8,} samples")
     else:
         print(f"  Format: CATEGORICAL")
         print(f"  Unique values ({len(unique_vals)}):")
@@ -210,19 +241,6 @@ def explore_languages(df: pd.DataFrame) -> str:
     if lang_col is None:
         print("  ⚠️  No explicit language column found.")
         print("  BigVul primarily contains C/C++ code.")
-        print("  The dataset is extracted from C/C++ projects.")
-        print()
-        
-        # Check if file extension info is available
-        for col in df.columns:
-            if "file" in col.lower() or "path" in col.lower() or "name" in col.lower():
-                print(f"  Potential file path column: '{col}'")
-                sample = df[col].dropna().head(5).tolist()
-                print(f"  Sample values: {sample}")
-                print()
-        
-        print("  DECISION: Languages will be inferred from file extensions")
-        print("  or hardcoded as C/C++ for BigVul.")
         return None
     
     print(f"  Column: '{lang_col}'")
@@ -234,28 +252,33 @@ def explore_languages(df: pd.DataFrame) -> str:
     return lang_col
 
 
-def explore_code_snippets(df: pd.DataFrame) -> None:
-    """Analyze code snippet columns."""
-    code_cols = []
-    for candidate in ["func_before", "func_after", "code", "source", "snippet",
-                       "processed_func", "vul_func_with_fix"]:
-        if candidate in df.columns:
-            code_cols.append(candidate)
+def explore_code_columns(df: pd.DataFrame) -> list:
+    """Analyze code snippet / commit columns."""
+    # Check for actual code columns
+    code_candidates = [
+        "func_before", "func_after", "code", "source", "snippet",
+        "processed_func", "vul_func_with_fix",
+    ]
+    code_cols = [c for c in code_candidates if c in df.columns]
+    
+    # Check for commit/version reference columns
+    ref_candidates = [
+        "version_before_fix", "version_after_fix", "commit_id",
+        "ref_link", "cve_page",
+    ]
+    ref_cols = [c for c in ref_candidates if c in df.columns]
     
     print("=" * 60)
-    print("CODE SNIPPET COLUMNS")
+    print("CODE & REFERENCE COLUMNS")
     print("=" * 60)
     
-    if not code_cols:
-        print("  ⚠️  No recognized code snippet columns found.")
-        print(f"   All columns: {list(df.columns)}")
-    else:
+    if code_cols:
+        print("  ✅ Code snippet columns found:")
         for col in code_cols:
             non_null = df[col].notna().sum()
             avg_len = df[col].dropna().str.len().mean()
-            print(f"  '{col}': {non_null:,} non-null, avg length {avg_len:.0f} chars")
+            print(f"    '{col}': {non_null:,} non-null, avg {avg_len:.0f} chars")
         
-        # Show a sample
         main_col = code_cols[0]
         print(f"\n  Sample from '{main_col}' (first 200 chars):")
         sample = df[main_col].dropna().iloc[0][:200]
@@ -263,20 +286,85 @@ def explore_code_snippets(df: pd.DataFrame) -> None:
         for line in sample.split("\n")[:8]:
             print(f"  | {line}")
         print(f"  ---")
+    else:
+        print("  ⚠️  No inline code snippet columns found.")
+        print()
+        print("  This dataset version contains CVE metadata + commit references,")
+        print("  NOT inline source code. The actual code must be fetched from")
+        print("  git repositories using the commit hashes.")
+    
+    if ref_cols:
+        print()
+        print("  Reference columns available:")
+        for col in ref_cols:
+            non_null = df[col].notna().sum()
+            sample = str(df[col].dropna().iloc[0])[:60] if non_null > 0 else "N/A"
+            print(f"    '{col}': {non_null:,} non-null")
+            print(f"      Example: {sample}")
+    
     print()
+    
+    if not code_cols:
+        print("  ⚠️  CRITICAL: No code in this dataset version.")
+        print()
+        print("  For ML training, we need actual source code. Options:")
+        print("    1. Use BigVul with code (available on HuggingFace as")
+        print("       'benjis/bigvul' or similar processed versions)")
+        print("    2. Use Devign dataset (balanced, includes C/C++ functions)")
+        print("    3. Fetch code from git repos using commit_id + project columns")
+        print("    4. Use this metadata for CWE/severity mapping and pair")
+        print("       with a code-inclusive dataset")
+        print()
+    
+    return code_cols
+
+
+def explore_additional_metadata(df: pd.DataFrame) -> None:
+    """Analyze additional useful columns."""
+    print("=" * 60)
+    print("ADDITIONAL METADATA")
+    print("=" * 60)
+    
+    # vulnerability_classification (could be useful as secondary label)
+    if "vulnerability_classification" in df.columns:
+        vc = df["vulnerability_classification"].value_counts()
+        non_null = df["vulnerability_classification"].notna().sum()
+        print(f"  vulnerability_classification: {non_null:,} non-null, {len(vc)} unique")
+        print(f"  Top 10:")
+        for val, count in vc.head(10).items():
+            print(f"    {str(val)[:40]:<42} {count:>6,}")
+        print()
+    
+    # access_complexity, authentication_required (CVSS sub-scores)
+    cvss_sub = ["access_complexity", "authentication_required",
+                "confidentiality_impact", "integrity_impact", "availability_impact"]
+    found_sub = [c for c in cvss_sub if c in df.columns]
+    if found_sub:
+        print(f"  CVSS v2 sub-scores available:")
+        for col in found_sub:
+            vals = df[col].value_counts()
+            non_null = df[col].notna().sum()
+            top = ", ".join(f"{v}({c})" for v, c in vals.head(3).items())
+            print(f"    {col}: {non_null:,} non-null — {top}")
+        print()
+    
+    # project distribution
+    if "project" in df.columns:
+        proj_counts = df["project"].value_counts()
+        print(f"  Projects: {len(proj_counts)} unique")
+        print(f"  Top 10:")
+        for proj, count in proj_counts.head(10).items():
+            print(f"    {str(proj)[:30]:<32} {count:>6,}")
+        print()
 
 
 def create_splits(df: pd.DataFrame, vul_col: str, cwe_col: str) -> dict:
     """
     Create stratified train/val/test splits.
     
-    Stratification strategy:
-    - Primary: stratify by vulnerability flag (vul_col)
-    - Secondary: within vulnerable samples, stratify by CWE-id
-    
-    This ensures each split has proportional representation of:
-    1. Vulnerable vs. non-vulnerable samples
-    2. Different CWE types
+    Since this dataset version has all vulnerable samples,
+    stratification is by CWE-id to ensure proportional
+    representation of each vulnerability type in each split.
     """
     from sklearn.model_selection import train_test_split
     
@@ -288,25 +376,26 @@ def create_splits(df: pd.DataFrame, vul_col: str, cwe_col: str) -> dict:
     print(f"  Seed:     {RANDOM_SEED}")
     print()
     
-    # Create a composite stratification key
-    # For non-vulnerable samples, use "non-vul" as the key
-    # For vulnerable samples, use the CWE-id
-    if vul_col and cwe_col:
-        strat_key = df.apply(
-            lambda row: f"vul_{row[cwe_col]}" if row[vul_col] == 1 else "non_vul",
-            axis=1
-        )
-        # For CWE classes with very few samples, group them as "vul_rare"
+    # Determine stratification key
+    if cwe_col and df[cwe_col].notna().sum() > 0:
+        # Stratify by CWE-id
+        # Fill NaN CWEs with a placeholder for stratification
+        strat_key = df[cwe_col].fillna("UNKNOWN").astype(str)
+        
+        # Group rare CWE classes (< 10 samples) to prevent split failures.
+        # With an 80/10/10 split, a CWE needs ~10 samples minimum to have
+        # at least 1 member in each split after two-stage stratification.
         key_counts = strat_key.value_counts()
-        rare_keys = key_counts[key_counts < 5].index
-        strat_key = strat_key.replace({k: "vul_rare" for k in rare_keys})
-        strat_label = "vulnerability flag + CWE-id"
+        rare_keys = key_counts[key_counts < 10].index
+        strat_key = strat_key.replace({k: "RARE_CWE" for k in rare_keys})
+        n_grouped = len(rare_keys)
+        strat_label = f"CWE-id ({len(key_counts)} original classes, {n_grouped} grouped as RARE_CWE)"
     elif vul_col:
         strat_key = df[vul_col].astype(str)
         strat_label = "vulnerability flag"
     else:
         strat_key = None
-        strat_label = "random (no stratification column found)"
+        strat_label = "random (no stratification column available)"
     
     # First split: train vs (val + test)
     val_test_ratio = SPLIT_RATIOS["val"] + SPLIT_RATIOS["test"]
@@ -344,18 +433,18 @@ def create_splits(df: pd.DataFrame, vul_col: str, cwe_col: str) -> dict:
         print(f"  {name:<10} {len(idx):>10,} {pct:>7.1f}%")
     print(f"  {'TOTAL':<10} {len(df):>10,} {'100.0':>7s}%")
     
-    # Show class balance in each split
-    if vul_col:
+    # Show CWE balance per split
+    if cwe_col:
         print()
-        print(f"  Vulnerable samples per split:")
-        print(f"  {'Split':<10} {'Vul':>8} {'Non-Vul':>10} {'Vul %':>8}")
-        print(f"  {'-'*38}")
+        print(f"  Top-5 CWE distribution per split:")
+        top5 = df[cwe_col].value_counts().head(5).index.tolist()
+        header = f"  {'Split':<8}" + "".join(f" {c:>10}" for c in top5)
+        print(header)
+        print(f"  {'-'*(8 + 11*len(top5))}")
         for name, idx in splits.items():
             subset = df.loc[idx]
-            vul = (subset[vul_col] == 1).sum()
-            non_vul = (subset[vul_col] == 0).sum()
-            pct = vul / len(subset) * 100
-            print(f"  {name:<10} {vul:>8,} {non_vul:>10,} {pct:>7.1f}%")
+            counts = "".join(f" {(subset[cwe_col]==c).sum():>10,}" for c in top5)
+            print(f"  {name:<8}{counts}")
     
     print()
     
@@ -399,10 +488,13 @@ def main():
     # 6. Languages
     lang_col = explore_languages(df)
     
-    # 7. Code snippets
-    explore_code_snippets(df)
+    # 7. Code columns
+    code_cols = explore_code_columns(df)
     
-    # 8. Stratified splits
+    # 8. Additional metadata
+    explore_additional_metadata(df)
+    
+    # 9. Stratified splits
     try:
         splits = create_splits(df, vul_col, cwe_col)
     except Exception as e:
@@ -414,12 +506,21 @@ def main():
     print("SUMMARY")
     print("=" * 60)
     print(f"  Total samples:        {len(df):,}")
-    print(f"  Vulnerability column: {vul_col or 'NOT FOUND'}")
+    print(f"  All vulnerable:       {'YES' if vul_col is None else 'NO'}")
     print(f"  CWE-id column:        {cwe_col or 'NOT FOUND'}")
+    print(f"    Unique CWE-ids:     {df[cwe_col].nunique() if cwe_col else 'N/A'}")
     print(f"  Severity column:      {sev_col or 'NOT FOUND'}")
     print(f"  Language column:       {lang_col or 'NOT FOUND (C/C++ assumed)'}")
-    print(f"  Split strategy:       Stratified 80/10/10 (seed={RANDOM_SEED})")
+    print(f"  Inline code:          {'YES' if code_cols else 'NO — metadata only'}")
+    print(f"  Split strategy:       Stratified by CWE-id, 80/10/10 (seed={RANDOM_SEED})")
     print()
+    
+    if not code_cols:
+        print("⚠️  IMPORTANT: This dataset version is metadata-only.")
+        print("   The actual source code must be obtained separately.")
+        print("   See 'CODE & REFERENCE COLUMNS' section above for options.")
+        print()
+    
     print("✅ Phase 0 data exploration complete.")
     print()
 
