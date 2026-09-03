@@ -86,8 +86,6 @@ python src/data/load_and_explore.py --use-huggingface
 
 ### Data Exploration Results
 
-### Data Exploration Results
-
 Running `src/data/load_and_explore.py --use-huggingface` on the function-level BigVul dataset revealed:
 
 1. **Basic Statistics:**
