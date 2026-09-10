@@ -19,7 +19,14 @@ Usage:
         --code "int main() { char buf[10]; gets(buf); return 0; }"
 """
 
+<<<<<<< HEAD
 import os
+=======
+# Disable TensorFlow — prevents mutex deadlock on macOS (see train_binary.py)
+import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+>>>>>>> 7861432 (Phase 1 completed)
 import sys
 import json
 import argparse

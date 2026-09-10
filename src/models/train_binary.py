@@ -13,7 +13,17 @@ Outputs:
     - Training logs → logs/train_<model>_binary.log
 """
 
+<<<<<<< HEAD
 import os
+=======
+# Disable TensorFlow before importing transformers — TF 2.20 causes a
+# mutex deadlock ([mutex.cc : 452] RAW: Lock blocking) on macOS when
+# loading models via transformers.
+import os
+os.environ["USE_TF"] = "0"
+os.environ["USE_TORCH"] = "1"
+
+>>>>>>> 7861432 (Phase 1 completed)
 import sys
 import gc
 import json
@@ -73,6 +83,38 @@ def get_device() -> torch.device:
     return torch.device("cpu")
 
 
+<<<<<<< HEAD
+=======
+# ─── Local model resolution ──────────────────────────────────────────────────
+
+PRETRAINED_DIR = os.path.join(PROJECT_ROOT, "models", "pretrained")
+
+# Map HuggingFace model IDs to local directory names
+_LOCAL_MODEL_MAP = {
+    "Salesforce/codet5-base": "codet5-base",
+    "microsoft/graphcodebert-base": "graphcodebert-base",
+}
+
+
+def resolve_model_path(model_id: str):
+    """Return (path, local_files_only) for model loading.
+
+    Checks models/pretrained/<name>/ for a local copy of the model weights.
+    This avoids HuggingFace Hub downloads on systems with SSL issues.
+    Returns a tuple: (resolved_path, local_files_only_flag)
+    """
+    local_name = _LOCAL_MODEL_MAP.get(model_id)
+    if local_name:
+        local_path = os.path.join(PRETRAINED_DIR, local_name)
+        if os.path.isdir(local_path) and any(
+            f.endswith((".bin", ".safetensors")) for f in os.listdir(local_path)
+        ):
+            print(f"  📂 Loading from local: {local_path}")
+            return local_path, True
+    return model_id, False
+
+
+>>>>>>> 7861432 (Phase 1 completed)
 # ─── Model builders ─────────────────────────────────────────────────────────
 
 
@@ -91,7 +133,12 @@ class CodeT5BinaryClassifier(nn.Module):
         super().__init__()
         from transformers import T5EncoderModel
 
+<<<<<<< HEAD
         self.encoder = T5EncoderModel.from_pretrained(model_name)
+=======
+        resolved, local_only = resolve_model_path(model_name)
+        self.encoder = T5EncoderModel.from_pretrained(resolved, local_files_only=local_only)
+>>>>>>> 7861432 (Phase 1 completed)
         # Expose encoder config at top level for PEFT compatibility
         self.config = self.encoder.config
         hidden_size = self.config.d_model  # 768 for codet5-base
@@ -137,9 +184,17 @@ def build_model(model_key: str, use_lora: bool = True):
         target_modules = ["q", "v"]  # T5 attention projection names
     elif model_key == "graphcodebert":
         from transformers import AutoModelForSequenceClassification
+<<<<<<< HEAD
         model = AutoModelForSequenceClassification.from_pretrained(
             "microsoft/graphcodebert-base",
             num_labels=2,
+=======
+        resolved, local_only = resolve_model_path("microsoft/graphcodebert-base")
+        model = AutoModelForSequenceClassification.from_pretrained(
+            resolved,
+            num_labels=2,
+            local_files_only=local_only,
+>>>>>>> 7861432 (Phase 1 completed)
         )
         target_modules = ["query", "value"]  # RoBERTa attention projection names
     else:

@@ -59,22 +59,28 @@ Minor Project/
 │   ├── __init__.py
 │   ├── data/
 │   │   ├── __init__.py
+│   │   ├── dataset.py          # BigVulBinaryDataset, create_splits(), create_dataloaders()
 │   │   ├── download_bigvul.py  # Dataset downloader
 │   │   └── load_and_explore.py # Data exploration script
 │   ├── models/
 │   │   ├── __init__.py
+│   │   ├── train_binary.py     # Phase 1 training (CodeT5/GraphCodeBERT + LoRA)
 │   │   └── verify_models.py    # Model loading verification
 │   ├── evaluation/
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── evaluate_binary.py  # Phase 1 eval, comparison, and inference
 │   └── utils/
 │       └── __init__.py
 ├── models/
+│   ├── pretrained/             # Locally cached base model weights
 │   ├── checkpoints/            # Training checkpoints (gitignored)
 │   └── saved/                  # Final saved models (gitignored)
+│       └── phase1_winner/      # Best Phase 1 model (CodeT5 + LoRA)
 ├── docs/
-│   └── PHASE_0.md              # Phase 0 documentation
+│   ├── PHASE_0.md              # Phase 0 documentation
+│   └── PHASE_1.md              # Phase 1 documentation
 ├── app/                        # Streamlit app (future phases)
-├── logs/                       # Training logs
+├── logs/                       # Training logs & result JSONs
 ├── .gitignore
 ├── requirements.txt
 └── README.md
@@ -143,15 +149,35 @@ cppcheck --version
 
 ## Project Status
 
-**✅ Phase 0 complete** — Project structure initialized, environment set up, data exploration done, model loading verified.
+**✅ Phase 1 complete** — Binary vulnerability detection baseline trained, evaluated, and winner selected (CodeT5).
 
 | Phase | Description | Status |
 |-------|-------------|--------|
 | **0** | Scoping & Setup | ✅ Complete |
-| 1 | Data Preprocessing & Feature Engineering | 🔲 Not started |
-| 2 | Vulnerability Detection (Binary) | 🔲 Not started |
-| 3 | CWE Multi-Class Classification | 🔲 Not started |
-| 4 | Severity Scoring | 🔲 Not started |
-| 5 | LLM-Based Code Refinement | 🔲 Not started |
-| 6 | Integration & Streamlit App | 🔲 Not started |
-| 7 | Evaluation & Final Report | 🔲 Not started |
+| **1** | Detection Baseline (Binary Classification) | ✅ Complete |
+| 2 | CWE Multi-Class Classification | 🔲 Not started |
+| 3 | Severity Scoring | 🔲 Not started |
+| 4 | LLM-Based Code Refinement | 🔲 Not started |
+| 5 | Integration & Streamlit App | 🔲 Not started |
+| 6 | Evaluation & Final Report | 🔲 Not started |
+
+---
+
+## Detection Baseline Results (Phase 1)
+
+**🏆 Winner: CodeT5** (with LoRA, rank=16, alpha=32)
+
+| Metric | CodeT5 | GraphCodeBERT | Winner |
+|--------|--------|---------------|--------|
+| **Recall ★** | **0.5667** | 0.5533 | CodeT5 |
+| Precision | **0.8586** | 0.8469 | CodeT5 |
+| F1 | **0.6827** | 0.6694 | CodeT5 |
+| AUROC | **0.9087** | 0.9062 | CodeT5 |
+| Accuracy | **0.9737** | 0.9727 | CodeT5 |
+| Loss ↓ | **0.1068** | 0.1174 | CodeT5 |
+
+**Selection:** CodeT5 won on all 6 metrics. Recall is the primary metric (0.5667 vs 0.5533).
+
+**Training config:** 20K samples (stratified), 5 epochs, batch=8, grad_accum=4, lr=2e-4, max_length=256, LoRA (r=16, α=32).
+
+See [`docs/PHASE_1.md`](docs/PHASE_1.md) for full details, commands, and known limitations.
