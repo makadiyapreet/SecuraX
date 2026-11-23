@@ -1,42 +1,51 @@
 # =============================================================
-# Automated Code Vulnerability Detection — Requirements
-# All packages are free/open-source (MIT/Apache-2.0/BSD/GPL)
+# SecuraX — Dependencies & Requirements
+# All packages are free / open-source (MIT / Apache-2.0 / BSD)
+# Compatible with: Windows (CUDA 12.1 / 12.4), Linux, macOS (Apple Silicon MPS)
 # =============================================================
 
-# ---------- Deep Learning & NLP ----------
+# ---------- Deep Learning & Hugging Face ----------
+# NOTE for Windows (CUDA): Install PyTorch with CUDA first:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 torch>=2.1.0
 transformers>=4.46.0,<5.0.0
 tokenizers>=0.20.0,<0.22.0
 peft>=0.7.0
-bitsandbytes>=0.41.0        # 4-bit quantization for LLMs (CUDA)
-accelerate>=0.25.0           # model loading & device mapping
-datasets>=2.16.0             # HuggingFace dataset loading
-sentencepiece>=0.1.99        # tokenizer backend for some models
-protobuf>=3.20.0             # required by sentencepiece
+accelerate>=0.25.0
+datasets>=2.16.0
+sentencepiece>=0.1.99
+protobuf>=3.20.0
 
-# ---------- Data Science & Metrics ----------
+# ---------- CUDA Acceleration & Quantization (Windows / Linux) ----------
+bitsandbytes>=0.41.0
+
+# ---------- Data Science, Optimization & Metrics ----------
 scikit-learn>=1.3.0
+scipy>=1.10.0
 pandas>=2.1.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 
-# ---------- Visualization ----------
+# ---------- Visualization & Reporting ----------
 matplotlib>=3.8.0
 seaborn>=0.13.0
 
-# ---------- Jupyter ----------
+# ---------- Development & Notebooks ----------
 jupyter>=1.0.0
 ipykernel>=6.27.0
 
-# ---------- Static Analysis ----------
-bandit>=1.7.6                # Python vulnerability scanner
-# NOTE: cppcheck is a system-level tool — install via:
-#   macOS:  brew install cppcheck
-#   Ubuntu: sudo apt-get install cppcheck
+# ---------- Language Detection & Static Analysis ----------
+pygments>=2.17.0             # Language detection via guess_lexer() (BSD-2)
+bandit>=1.7.6                # Python security scanner (Apache 2.0)
+# NOTE: cppcheck is a system tool:
+#   Windows: winget install Cppcheck.Cppcheck  or choco install cppcheck
+#   macOS:   brew install cppcheck
+#   Linux:   sudo apt-get install cppcheck
 
-# ---------- Web App ----------
+# ---------- Web Application ----------
 streamlit>=1.29.0
 
-# ---------- Optional: vLLM (faster local LLM serving) ----------
-# Uncomment if you want to use vLLM instead of HF Transformers
-# for inference with Mistral/DeepSeek:
-# vllm>=0.2.7
+# ---------- Phase 4: Hosted LLM Refinement & Environment ----------
+groq>=0.11.0
+python-dotenv>=1.0.0
+pyyaml>=6.0
+

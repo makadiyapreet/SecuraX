@@ -8,10 +8,12 @@ dist/
 build/
 *.so
 
-# ===== Virtual Environment =====
+# ===== Virtual Environment & Secrets =====
 .venv/
 env/
 .env/
+.env
+!.env.example
 
 # ===== Jupyter =====
 .ipynb_checkpoints/
@@ -26,6 +28,7 @@ env/
 
 # ===== OS =====
 .DS_Store
+._*
 Thumbs.db
 
 # ===== Data (large files, download separately) =====
@@ -59,3 +62,4 @@ outputs/
 # ===== Misc =====
 *.tar.gz
 *.zip
+external/AIBugHunter/

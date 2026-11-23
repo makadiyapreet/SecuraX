@@ -1,0 +1,42 @@
+# ==============================================================================
+# SecuraX Phase 4 — Code Refinement Configuration
+# Model & client settings for Groq-hosted LLM inference
+# ==============================================================================
+
+# Models (open-weight, verified via Groq models API endpoint)
+# Note: Model availability can be checked at https://console.groq.com/docs/models
+models:
+  default: "qwen/qwen3.8-27b"          # Qwen 3.8 27B (primary instruction code model)
+  alternate: "openai/gpt-oss-120b"     # OpenAI GPT-OSS 120B (high-capacity alternate model)
+
+
+# Generation hyperparameters
+generation:
+  temperature: 0.1                      # Low temperature (0.0-0.2) for deterministic, reproducible code
+  max_tokens: 800                       # Kept under Groq free-tier OTPM ceiling (1000 tokens)
+  timeout_seconds: 30.0                 # API call timeout
+  top_p: 0.95
+
+# Retries and resilience
+resilience:
+  max_retries: 5                        # Hard cap on retry attempts
+  backoff_base: 2.0                     # Exponential backoff base (seconds)
+  backoff_max: 60.0                     # Maximum wait time per retry
+  jitter: true                          # Add random jitter to prevent thundering herd
+
+# Client-side rate limiting (conservative free-tier boundaries)
+rate_limits:
+  requests_per_minute: 30               # Groq free tier RPM ceiling
+  requests_per_day: 1000                # Conservative RPD ceiling
+  tokens_per_minute: 12000              # Conservative TPM ceiling
+  min_request_interval_seconds: 2.0     # Minimum spacing between calls to stay well below RPM
+
+# On-disk response cache (hash(model + prompt + params))
+cache:
+  enabled: true
+  cache_dir: "data/cache/groq"          # Saved responses avoid re-spending quota on reruns
+
+# Telemetry and logging (NEVER logs API keys or full prompt unless debug is true)
+telemetry:
+  log_file: "logs/groq_calls.jsonl"
+  debug: false

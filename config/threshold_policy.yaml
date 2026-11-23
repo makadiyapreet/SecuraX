@@ -1,0 +1,23 @@
+# config/threshold_policy.yaml — SecuraX Threshold Policy Configuration
+#
+# Production defaults preserve the evaluated models in Phase 1 v2.
+# Setting use_validation_thresholds to true enables the recall-prioritized
+# threshold selected under the P_floor = 0.30 policy.
+
+precision_floor: 0.30
+use_validation_thresholds: false
+
+thresholds_production_default:
+  tier1_c_cpp: 0.70
+  tier2_cpp: 0.10
+  tier2_python: 0.15
+  tier2_php: 0.10
+  tier3_shared: 0.50
+
+thresholds_validation_pfloor_30:
+  tier1_c_cpp: 0.20
+  tier2_cpp: 0.10
+  tier2_python: 0.10
+  tier2_php: 0.10
+  tier3_shared: 0.50
+
